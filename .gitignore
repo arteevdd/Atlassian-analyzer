@@ -1,6 +1,12 @@
 # Compiled class file
 *.class
 
+# Игнорировать директорию .idea
+.idea/
+
+# Игнорировать директорию target
+target/
+
 # Log file
 *.log
 
