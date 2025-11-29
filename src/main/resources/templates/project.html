@@ -4,10 +4,44 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title th:text="'Atlassian Analyzer - ' + ${projectName}">Project</title>
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/x-icon" href="/favicon/favicon.ico">
+    <link rel="icon" type="image/svg+xml" href="/favicon/favicon.svg">
+    <link rel="apple-touch-icon" sizes="180x180" href="/favicon/apple-touch-icon.png">
+    <link rel="manifest" href="/favicon/site.webmanifest">
+
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
         .navbar {
             background-color: #0052CC;
+        }
+        .issue-card {
+            border-left: 4px solid #0052CC;
+            transition: all 0.2s;
+        }
+        .issue-card:hover {
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            transform: translateY(-1px);
+        }
+        .status-badge {
+            font-size: 0.8em;
+            padding: 4px 8px;
+        }
+        .issue-key {
+            font-weight: bold;
+            color: #0052CC;
+            text-decoration: none;
+        }
+        .issue-key:hover {
+            text-decoration: underline;
+        }
+        .summary {
+            color: #333;
+            text-decoration: none;
+        }
+        .summary:hover {
+            color: #0052CC;
         }
     </style>
 </head>
@@ -21,6 +55,7 @@
 
 <!-- Основной контент -->
 <div class="container mt-4">
+    <!-- Хлебные крошки -->
     <div class="row">
         <div class="col-12">
             <nav aria-label="breadcrumb">
@@ -30,18 +65,124 @@
                 </ol>
             </nav>
 
+            <!-- Сообщение об ошибке -->
+            <div th:if="${error}" class="alert alert-danger" role="alert">
+                <span th:text="${error}">Ошибка</span>
+            </div>
+
             <h2 th:text="${projectName + ' (' + projectKey + ')'}">Project Name (KEY)</h2>
-            <p class="text-muted">Аналитика задач проекта</p>
+            <p class="text-muted" th:text="${projectDescription}">Описание проекта</p>
         </div>
     </div>
 
+    <!-- Статистика -->
     <div class="row mt-4">
         <div class="col-12">
-            <div class="alert alert-info" role="alert">
-                <h4 class="alert-heading">Аналитика в разработке</h4>
-                <p>Функциональность аналитических отчетов находится в разработке.</p>
-                <hr>
-                <p class="mb-0">Скоро здесь появятся графики и диаграммы с аналитикой проекта.</p>
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Статистика проекта</h5>
+                    <div class="row">
+                        <div class="col-md-3">
+                            <div class="text-center">
+                                <h3 th:text="${#lists.size(issues)}">0</h3>
+                                <p class="text-muted">Всего задач</p>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="text-center">
+                                <h3 th:text="${completedCount}">0</h3>
+                                <p class="text-muted">Завершено</p>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="text-center">
+                                <h3 th:text="${inProgressCount}">0</h3>
+                                <p class="text-muted">В работе</p>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="text-center">
+                                <h3 th:text="${assignedCount}">0</h3>
+                                <p class="text-muted">С исполнителем</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Список задач -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h4 class="mb-0">Задачи проекта</h4>
+                <small class="text-muted">Нажмите на номер задачи для перехода в JIRA</small>
+            </div>
+
+            <!-- Сообщение если задач нет -->
+            <div th:if="${#lists.isEmpty(issues)}" class="alert alert-info">
+                Нет задач для отображения или произошла ошибка при загрузке.
+            </div>
+
+            <!-- Карточки задач -->
+            <div th:each="issue : ${issues}" class="card mb-3 issue-card">
+                <div class="card-body">
+                    <div class="row">
+                        <!-- Левая колонка -->
+                        <div class="col-md-8">
+                            <div class="row">
+                                <div class="col-12 mb-2">
+                                    <a th:href="${jiraBaseUrl + '/browse/' + issue.key}"
+                                       target="_blank"
+                                       class="issue-key"
+                                       th:text="${issue.key}">KEY-123</a>
+                                    <span class="badge status-badge ms-2"
+                                          th:classappend="${issue.fields.status.name == 'Done'} ? 'bg-success' :
+                                                              (${issue.fields.status.name == 'In Progress'} ? 'bg-primary' : 'bg-secondary')"
+                                          th:text="${issue.fields.status.name}">Status</span>
+                                </div>
+                                <div class="col-12 mb-2">
+                                    <a th:href="${jiraBaseUrl + '/browse/' + issue.key}"
+                                       target="_blank"
+                                       class="summary"
+                                       th:text="${issue.fields.summary}">Название задачи</a>
+                                </div>
+                                <div class="col-12">
+                                    <small class="text-muted">
+                                        <strong>Исполнитель:</strong>
+                                        <span th:if="${issue.fields.assignee != null}" th:text="${issue.fields.assignee.displayName}">Assignee</span>
+                                        <span th:if="${issue.fields.assignee == null}">Не назначен</span>
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Правая колонка -->
+                        <div class="col-md-4">
+                            <div class="row">
+                                <div class="col-12 mb-2">
+                                    <small class="text-muted">
+                                        <strong>Создана:</strong><br>
+                                        <span th:text="${#strings.substring(issue.fields.created, 0, 10)}">2023-01-01</span>
+                                    </small>
+                                </div>
+                                <div class="col-12">
+                                    <small class="text-muted">
+                                        <strong>Обновлена:</strong><br>
+                                        <span th:text="${#strings.substring(issue.fields.updated, 0, 10)}">2023-01-01</span>
+                                    </small>
+                                </div>
+                                <div th:if="${issue.fields.resolutionDate != null}" class="col-12 mt-2">
+                                    <small class="text-success">
+                                        <strong>Закрыта:</strong><br>
+                                        <span th:text="${#strings.substring(issue.fields.resolutionDate, 0, 10)}">2023-01-01</span>
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>

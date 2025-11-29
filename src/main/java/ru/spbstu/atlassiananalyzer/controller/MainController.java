@@ -1,5 +1,7 @@
 package ru.spbstu.atlassiananalyzer.controller;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -9,11 +11,13 @@ import ru.spbstu.atlassiananalyzer.dto.ProjectDto;
 import ru.spbstu.atlassiananalyzer.service.JiraService;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Controller
 @RequestMapping("/")
 public class MainController {
 
+    private static final Logger logger = LoggerFactory.getLogger(MainController.class);
     private final JiraService jiraService;
 
     @Autowired
@@ -24,7 +28,54 @@ public class MainController {
     @GetMapping
     public String index(Model model) {
         List<ProjectDto> projects = jiraService.getAllProjects();
-        model.addAttribute("projects", projects);
+
+        // Очищаем описания
+        List<ProjectDto> cleanedProjects = projects.stream()
+                .map(this::cleanProjectDescription)
+                .collect(Collectors.toList());
+
+        // Логируем результат
+        long withDescriptions = cleanedProjects.stream()
+                .filter(p -> p.getDescription() != null)
+                .count();
+        logger.info("After cleaning: {}/{} projects have descriptions", withDescriptions, cleanedProjects.size());
+
+        model.addAttribute("projects", cleanedProjects);
         return "index";
+    }
+
+    private ProjectDto cleanProjectDescription(ProjectDto project) {
+        boolean isRetired = project.getName().contains("(Retired)");
+
+        ProjectDto cleanedProject = new ProjectDto();
+        cleanedProject.setKey(project.getKey());
+        cleanedProject.setName(project.getName());
+
+        // Для retired проектов не показываем описание
+        if (isRetired) {
+            cleanedProject.setDescription(null);
+        } else {
+            // Для активных проектов очищаем HTML теги
+            String cleanedDescription = project.getDescription();
+            if (cleanedDescription != null && !cleanedDescription.equals("null") && !cleanedDescription.isEmpty()) {
+                // Удаляем HTML теги
+                cleanedDescription = cleanedDescription
+                        .replaceAll("<[^>]*>", "")
+                        .replaceAll("\\s+", " ")
+                        .trim();
+
+                // Если после очистки осталась пустая строка, считаем что описания нет
+                if (cleanedDescription.isEmpty()) {
+                    cleanedDescription = null;
+                } else if (cleanedDescription.length() > 120) {
+                    cleanedDescription = cleanedDescription.substring(0, 117) + "...";
+                }
+            } else {
+                cleanedDescription = null;
+            }
+            cleanedProject.setDescription(cleanedDescription);
+        }
+
+        return cleanedProject;
     }
 }

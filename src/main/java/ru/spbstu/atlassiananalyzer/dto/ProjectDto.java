@@ -1,13 +1,30 @@
 package ru.spbstu.atlassiananalyzer.dto;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class ProjectDto {
+
+    @JsonProperty("key")
     private String key;
+
+    @JsonProperty("name")
     private String name;
+
+    @JsonProperty("description")
     private String description;
 
+    // Конструкторы
+    public ProjectDto() {}
+
+    public ProjectDto(String key, String name, String description) {
+        this.key = key;
+        this.name = name;
+        this.description = description;
+    }
+
+    // Геттеры и сеттеры
     public String getKey() {
         return key;
     }
@@ -30,5 +47,10 @@ public class ProjectDto {
 
     public void setDescription(String description) {
         this.description = description;
+    }
+
+    @Override
+    public String toString() {
+        return "ProjectDto{key='" + key + "', name='" + name + "', description='" + description + "'}";
     }
 }
