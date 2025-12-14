@@ -52,6 +52,51 @@ public class IssueDto {
         @JsonProperty("resolutiondate")
         private String resolutionDate;
 
+        @JsonProperty("timespent")
+        private Long timespent;
+
+        @JsonProperty("timeoriginalestimate")
+        private Long timeoriginalestimate;
+
+        @JsonProperty("timetracking")
+        private TimeTracking timetracking;
+
+        @JsonProperty("priority")
+        private Priority priority;
+
+        public Priority getPriority() {
+            return priority;
+        }
+
+        public void setPriority(Priority priority) {
+            this.priority = priority;
+        }
+
+        // Геттеры и сеттеры
+        public Long getTimespent() {
+            return timespent;
+        }
+
+        public void setTimespent(Long timespent) {
+            this.timespent = timespent;
+        }
+
+        public Long getTimeoriginalestimate() {
+            return timeoriginalestimate;
+        }
+
+        public void setTimeoriginalestimate(Long timeoriginalestimate) {
+            this.timeoriginalestimate = timeoriginalestimate;
+        }
+
+        public TimeTracking getTimetracking() {
+            return timetracking;
+        }
+
+        public void setTimetracking(TimeTracking timetracking) {
+            this.timetracking = timetracking;
+        }
+
         public String getSummary() {
             return summary;
         }
@@ -125,6 +170,42 @@ public class IssueDto {
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class Priority {
+        @JsonProperty("name")
+        private String name;
+
+        @JsonProperty("id")
+        private String id;
+
+        @JsonProperty("iconUrl")
+        private String iconUrl;
+
+        public String getName() {
+            return name;
+        }
+
+        public void setName(String name) {
+            this.name = name;
+        }
+
+        public String getId() {
+            return id;
+        }
+
+        public void setId(String id) {
+            this.id = id;
+        }
+
+        public String getIconUrl() {
+            return iconUrl;
+        }
+
+        public void setIconUrl(String iconUrl) {
+            this.iconUrl = iconUrl;
+        }
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public static class User {
 
         @JsonProperty("displayName")
@@ -136,6 +217,43 @@ public class IssueDto {
 
         public void setDisplayName(String displayName) {
             this.displayName = displayName;
+        }
+    }
+
+    // Дополнительный класс для timetracking
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class TimeTracking {
+        @JsonProperty("originalEstimate")
+        private String originalEstimate;
+
+        @JsonProperty("remainingEstimate")
+        private String remainingEstimate;
+
+        @JsonProperty("timeSpent")
+        private String timeSpent;
+
+        public String getOriginalEstimate() {
+            return originalEstimate;
+        }
+
+        public void setOriginalEstimate(String originalEstimate) {
+            this.originalEstimate = originalEstimate;
+        }
+
+        public String getRemainingEstimate() {
+            return remainingEstimate;
+        }
+
+        public void setRemainingEstimate(String remainingEstimate) {
+            this.remainingEstimate = remainingEstimate;
+        }
+
+        public String getTimeSpent() {
+            return timeSpent;
+        }
+
+        public void setTimeSpent(String timeSpent) {
+            this.timeSpent = timeSpent;
         }
     }
 }
