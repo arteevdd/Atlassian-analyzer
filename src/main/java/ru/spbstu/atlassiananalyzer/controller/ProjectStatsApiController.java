@@ -1,16 +1,11 @@
 package ru.spbstu.atlassiananalyzer.controller;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
-import org.springframework.stereotype.Controller;
-import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 import ru.spbstu.atlassiananalyzer.dto.IssueDto;
-import ru.spbstu.atlassiananalyzer.dto.ProjectDto;
 import ru.spbstu.atlassiananalyzer.service.JiraService;
 
 import java.time.Duration;
@@ -18,74 +13,32 @@ import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
-@Controller
-@RequestMapping("/project")
-public class ProjectController {
+@RestController
+@RequestMapping("/api/project")
+public class ProjectStatsApiController {
 
-    private static final Logger logger = LoggerFactory.getLogger(ProjectController.class);
     private final JiraService jiraService;
-    private final String jiraBaseUrl;
+    private static final Logger logger = LoggerFactory.getLogger(ProjectStatsApiController.class);
 
     @Autowired
-    public ProjectController(JiraService jiraService, @Value("${jira.base-url}") String jiraBaseUrl) {
+    public ProjectStatsApiController(JiraService jiraService) {
         this.jiraService = jiraService;
-        this.jiraBaseUrl = jiraBaseUrl;
-    }
-
-    @GetMapping("/{projectKey}")
-    public String projectPage(@PathVariable String projectKey, Model model) {
-        try {
-            ProjectDto project = jiraService.getProjectByKey(projectKey);
-            model.addAttribute("projectKey", project.getKey());
-            model.addAttribute("projectName", project.getName());
-            model.addAttribute("projectDescription",
-                    project.getDescription() != null ? project.getDescription() : "Описание недоступно");
-
-            List<IssueDto> issues = jiraService.getProjectIssues(projectKey, 200);
-            model.addAttribute("issues", issues);
-            model.addAttribute("jiraBaseUrl", jiraBaseUrl);
-
-            long completedCount = issues.stream()
-                    .filter(issue -> "Done".equals(issue.getFields().getStatus().getName()))
-                    .count();
-            long inProgressCount = issues.stream()
-                    .filter(issue -> !"Done".equals(issue.getFields().getStatus().getName()))
-                    .count();
-            long assignedCount = issues.stream()
-                    .filter(issue -> issue.getFields().getAssignee() != null)
-                    .count();
-
-            model.addAttribute("completedCount", completedCount);
-            model.addAttribute("inProgressCount", inProgressCount);
-            model.addAttribute("assignedCount", assignedCount);
-
-            logger.info("Loaded {} issues for project {}", issues.size(), projectKey);
-
-        } catch (Exception e) {
-            logger.error("Error loading project {}: {}", projectKey, e.getMessage());
-            model.addAttribute("error", "Ошибка загрузки данных проекта: " + e.getMessage());
-            model.addAttribute("projectKey", projectKey);
-            model.addAttribute("projectName", projectKey);
-            model.addAttribute("projectDescription", "Описание недоступно");
-            model.addAttribute("issues", Collections.emptyList());
-            model.addAttribute("completedCount", 0);
-            model.addAttribute("inProgressCount", 0);
-            model.addAttribute("assignedCount", 0);
-            model.addAttribute("jiraBaseUrl", jiraBaseUrl);
-        }
-
-        return "project";
     }
 
     @GetMapping("/{projectKey}/stats/data")
-    @ResponseBody
     public Map<String, Object> getProjectStatsData(@PathVariable String projectKey) {
         try {
             logger.info("Loading stats data for project: {}", projectKey);
+
+            // Получаем задачи проекта
             List<IssueDto> issues = jiraService.getProjectIssues(projectKey, 500);
+
+            // Генерируем данные для графиков
             Map<String, Object> chartData = generateChartData(issues);
+
             logger.info("Successfully generated chart data for project: {}", projectKey);
             return chartData;
+
         } catch (Exception e) {
             logger.error("Error loading stats data for project {}: {}", projectKey, e.getMessage(), e);
             Map<String, Object> errorResponse = new HashMap<>();
@@ -94,36 +47,27 @@ public class ProjectController {
         }
     }
 
-    @GetMapping("/{projectKey}/stats/api-data")
-    @ResponseBody
-    public ResponseEntity<Map<String, Object>> getProjectStatsApiData(@PathVariable String projectKey) {
-        try {
-            logger.info("Loading stats data via API for project: {}", projectKey);
-            List<IssueDto> issues = jiraService.getProjectIssues(projectKey, 500);
-            Map<String, Object> chartData = generateChartData(issues);
-            logger.info("Successfully generated chart data via API for project: {}", projectKey);
-            return ResponseEntity.ok(chartData);
-        } catch (Exception e) {
-            logger.error("Error loading stats data via API for project {}: {}", projectKey, e.getMessage(), e);
-            Map<String, Object> errorResponse = new HashMap<>();
-            errorResponse.put("error", "Failed to load data: " + e.getMessage());
-            return ResponseEntity.status(500).body(errorResponse);
-        }
-    }
-
     private Map<String, Object> generateChartData(List<IssueDto> issues) {
         Map<String, Object> chartData = new HashMap<>();
+
+        // Данные для гистограммы времени в открытом состоянии
         chartData.put("openTimeHistogram", generateOpenTimeHistogramData(issues));
+
+        // Данные для диаграмм по состояниям
         chartData.put("statusTimeDistribution", generateStatusTimeDistributionData(issues));
+
         return chartData;
     }
 
     private Map<String, Object> generateOpenTimeHistogramData(List<IssueDto> issues) {
+        // Фильтруем только закрытые задачи
         List<IssueDto> closedIssues = issues.stream()
                 .filter(issue -> issue.getFields().getResolutionDate() != null)
                 .collect(Collectors.toList());
 
         logger.info("Processing {} closed issues for histogram", closedIssues.size());
+
+        // Инициализируем временные интервалы
         List<Integer> timeBuckets = new ArrayList<>(Arrays.asList(0, 0, 0, 0, 0, 0, 0));
 
         for (IssueDto issue : closedIssues) {
@@ -132,13 +76,16 @@ public class ProjectController {
                 String resolvedStr = issue.getFields().getResolutionDate();
 
                 if (createdStr == null || resolvedStr == null) {
+                    logger.debug("Skipping issue {} with null dates", issue.getKey());
                     continue;
                 }
 
                 LocalDateTime created = LocalDateTime.parse(createdStr.substring(0, 19));
                 LocalDateTime resolved = LocalDateTime.parse(resolvedStr.substring(0, 19));
+
                 long daysBetween = Duration.between(created, resolved).toDays();
 
+                // Распределяем по интервалам
                 int bucketIndex;
                 if (daysBetween < 1) bucketIndex = 0;
                 else if (daysBetween < 3) bucketIndex = 1;
@@ -160,17 +107,22 @@ public class ProjectController {
         Map<String, Object> result = new HashMap<>();
         result.put("labels", Arrays.asList("< 1 дня", "1-3 дня", "3-7 дней", "1-2 недели", "2-4 недели", "1-3 месяца", "> 3 месяцев"));
         result.put("data", timeBuckets);
+
         return result;
     }
 
     private Map<String, Object> generateStatusTimeDistributionData(List<IssueDto> issues) {
         Map<String, Object> result = new HashMap<>();
+
+        // Пока используем тестовые данные
         List<IssueDto> closedIssues = issues.stream()
                 .filter(issue -> issue.getFields().getResolutionDate() != null)
                 .collect(Collectors.toList());
 
         int totalClosed = closedIssues.size();
+        logger.info("Generating status distribution for {} closed issues", totalClosed);
 
+        // Простое распределение для демонстрации
         Map<String, Object> todoData = new HashMap<>();
         todoData.put("labels", Arrays.asList("< 1 часа", "1-4 часа", "4-24 часа", "1-3 дня", "> 3 дней"));
         todoData.put("data", Arrays.asList(

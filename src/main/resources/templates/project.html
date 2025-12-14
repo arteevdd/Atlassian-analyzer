@@ -43,6 +43,14 @@
         .summary:hover {
             color: #0052CC;
         }
+        .stats-card {
+            position: relative;
+        }
+        .stats-button {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+        }
     </style>
 </head>
 <body>
@@ -55,7 +63,7 @@
 
 <!-- Основной контент -->
 <div class="container mt-4">
-    <!-- Хлебные крошки -->
+    <!-- Хлебные крошки и заголовок -->
     <div class="row">
         <div class="col-12">
             <nav aria-label="breadcrumb">
@@ -70,15 +78,26 @@
                 <span th:text="${error}">Ошибка</span>
             </div>
 
-            <h2 th:text="${projectName + ' (' + projectKey + ')'}">Project Name (KEY)</h2>
-            <p class="text-muted" th:text="${projectDescription}">Описание проекта</p>
+            <div class="d-flex justify-content-between align-items-start">
+                <div>
+                    <h2 th:text="${projectName + ' (' + projectKey + ')'}">Project Name (KEY)</h2>
+                    <p class="text-muted" th:text="${projectDescription}">Описание проекта</p>
+                </div>
+                <div class="text-end">
+                    <a th:href="@{/project/{key}/stats(key=${projectKey})}" class="btn btn-primary mb-2">
+                        📊 Детальная статистика
+                    </a>
+                    <br>
+                    <a th:href="@{/}" class="btn btn-outline-secondary btn-sm">← К списку проектов</a>
+                </div>
+            </div>
         </div>
     </div>
 
     <!-- Статистика -->
     <div class="row mt-4">
         <div class="col-12">
-            <div class="card">
+            <div class="card stats-card">
                 <div class="card-body">
                     <h5 class="card-title">Статистика проекта</h5>
                     <div class="row">
@@ -109,6 +128,13 @@
                     </div>
                 </div>
             </div>
+        </div>
+    </div>
+
+    <!-- Кнопки навигации -->
+    <div class="row mt-3">
+        <div class="col-12">
+            <a th:href="@{/}" class="btn btn-secondary">← Назад к списку проектов</a>
         </div>
     </div>
 
