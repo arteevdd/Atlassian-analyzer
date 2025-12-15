@@ -178,7 +178,7 @@
             <canvas id="priorityChart"></canvas>
         </div>
         <div id="priorityStats" class="mt-3 small text-muted">
-            <!-- Сюда добавим статистику -->
+            <canvas id="initPriorityChart"></canvas>
         </div>
     </div>
 </div>
@@ -186,6 +186,192 @@
 <script>
     const projectKey = '[[${projectKey}]]';
     console.log('📊 Инициализация страницы статистики для проекта:', projectKey);
+
+    async function loadAndRenderCharts() {
+        try {
+            console.log('📡 Загружаем данные для графиков для проекта:', projectKey);
+
+            const response = await fetch(`/project/${projectKey}/stats/data`);
+
+            if (!response.ok) {
+                throw new Error(`HTTP ошибка: ${response.status}`);
+            }
+
+            const chartData = await response.json();
+            console.log('✅ Все данные получены:', chartData);
+
+            // Отладка: что пришло в данных приоритетов
+            if (chartData.priorityChart) {
+                console.log('🎯 Priority chart data structure:', {
+                    hasLabels: !!chartData.priorityChart.labels,
+                    labelsCount: chartData.priorityChart.labels?.length || 0,
+                    hasData: !!chartData.priorityChart.data,
+                    dataCount: chartData.priorityChart.data?.length || 0,
+                    message: chartData.priorityChart.message,
+                    totalIssues: chartData.priorityChart.totalIssues
+                });
+            } else {
+                console.warn('⚠️ priorityChart is missing in response!');
+            }
+
+            // Инициализация всех графиков
+            initOpenTimeHistogram(chartData.openTimeHistogram);
+            initStatusCharts(chartData.statusTimeDistribution);
+
+            if (chartData.dailyIssueChart) {
+                initDailyIssueChart(chartData.dailyIssueChart);
+            }
+
+            if (chartData.userStatsChart) {
+                initUserStatsChart(chartData.userStatsChart);
+            }
+
+            if (chartData.loggedTimeChart) {
+                initLoggedTimeChart(chartData.loggedTimeChart);
+            }
+
+            // ВАЖНО: Всегда пытаемся инициализировать график приоритетов
+            if (chartData.priorityChart) {
+                initPriorityChart(chartData.priorityChart);
+            } else {
+                console.error('❌ priorityChart is missing from API response');
+                showPriorityError('Данные о приоритетах отсутствуют в ответе сервера.');
+            }
+
+        } catch (error) {
+            console.error('❌ Ошибка загрузки графиков:', error);
+            // Показать общую ошибку
+        }
+    }
+
+    function initPriorityChart(priorityData) {
+        try {
+            console.log('Priority chart data received:', priorityData);
+
+            const canvas = document.getElementById('priorityChart');
+            const ctx = canvas.getContext('2d');
+
+            // Скрываем сообщение об ошибке
+            document.getElementById('priorityError').style.display = 'none';
+
+            // Проверяем, есть ли данные
+            if (!priorityData || !priorityData.labels || priorityData.labels.length === 0) {
+                console.error('No priority chart data available');
+                showPriorityError('Нет данных для отображения графика приоритетов.');
+                return;
+            }
+
+            // Проверяем, есть ли данные для отображения
+            const totalTasks = priorityData.data?.reduce((a, b) => a + b, 0) || 0;
+            if (totalTasks === 0) {
+                console.warn('All priority data values are zero');
+                showPriorityError('Все задачи имеют одинаковый приоритет или данные отсутствуют.');
+                return;
+            }
+
+            console.log('Creating priority chart with:', priorityData.labels.length, 'categories,', totalTasks, 'total tasks');
+
+            // Создаем график
+            const chart = new Chart(ctx, {
+                type: 'pie',
+                data: {
+                    labels: priorityData.labels,
+                    datasets: [{
+                        data: priorityData.data,
+                        backgroundColor: priorityData.backgroundColor || [
+                            'rgba(255, 99, 132, 0.8)',
+                            'rgba(54, 162, 235, 0.8)',
+                            'rgba(255, 206, 86, 0.8)',
+                            'rgba(75, 192, 192, 0.8)',
+                            'rgba(153, 102, 255, 0.8)'
+                        ],
+                        borderColor: priorityData.borderColor || [
+                            'rgba(255, 99, 132, 1)',
+                            'rgba(54, 162, 235, 1)',
+                            'rgba(255, 206, 86, 1)',
+                            'rgba(75, 192, 192, 1)',
+                            'rgba(153, 102, 255, 1)'
+                        ],
+                        borderWidth: 2,
+                        hoverOffset: 15
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'right',
+                            labels: {
+                                padding: 15,
+                                usePointStyle: true,
+                                pointStyle: 'circle',
+                                font: {
+                                    size: 12
+                                }
+                            }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const label = context.label || '';
+                                    const value = context.raw || 0;
+                                    const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                    const percentage = Math.round((value / total) * 100);
+                                    return `${label}: ${value} задач (${percentage}%)`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+
+            // Обновляем статистику
+            const statsElement = document.getElementById('priorityStats');
+            if (statsElement) {
+                const total = priorityData.totalIssues || priorityData.data.reduce((a, b) => a + b, 0);
+                const unique = priorityData.uniqueCategories || priorityData.labels.length;
+                const type = priorityData.chartType === 'status' ? 'статусов' : 'приоритетов';
+
+                statsElement.innerHTML = `
+                <div class="row">
+                    <div class="col-md-6">
+                        <strong>Всего задач:</strong> ${total}
+                    </div>
+                    <div class="col-md-6">
+                        <strong>Уникальных ${type}:</strong> ${unique}
+                    </div>
+                </div>
+                ${priorityData.message ? `<div class="mt-2 text-info"><small>${priorityData.message}</small></div>` : ''}
+            `;
+            }
+
+            console.log('✅ Priority chart initialized successfully');
+            return chart;
+
+        } catch (error) {
+            console.error('❌ Error initializing priority chart:', error);
+            showPriorityError('Ошибка при создании графика: ' + error.message);
+        }
+    }
+
+    // Функция для показа ошибки
+    function showPriorityError(message) {
+        const errorDiv = document.getElementById('priorityError');
+        const messageSpan = document.getElementById('priorityErrorMessage');
+
+        if (errorDiv && messageSpan) {
+            messageSpan.textContent = message;
+            errorDiv.style.display = 'block';
+        }
+
+        // Скрываем canvas
+        const canvas = document.getElementById('priorityChart');
+        if (canvas) {
+            canvas.style.display = 'none';
+        }
+    }
+
 
     async function loadAndRenderCharts() {
         try {
@@ -305,20 +491,45 @@
     function initStatusCharts(statusData) {
         try {
             const container = document.getElementById('statusChartsContainer');
-
             container.querySelector('.loading-spinner').style.display = 'none';
-
             container.innerHTML = '';
 
+            // Проверяем, есть ли реальные данные
+            const hasRealData = Object.keys(statusData).length > 0 &&
+                !statusData.message; // Если нет сообщения об ошибке
+
+            if (!hasRealData) {
+                container.innerHTML = `
+                <div class="alert alert-warning">
+                    <strong>Внимание:</strong> Данные о распределении времени по состояниям
+                    временно недоступны. Для получения этих данных требуется доступ к истории
+                    изменений задач.
+                </div>
+            `;
+                return;
+            }
+
+            // Отображаем данные для каждого статуса
             Object.entries(statusData).forEach(([statusName, statusChartData], index) => {
+                // Проверяем, что есть данные для отображения
+                if (!statusChartData.labels || statusChartData.labels.length === 0) {
+                    return;
+                }
+
                 const chartSection = document.createElement('div');
                 chartSection.className = 'status-chart-section mb-4';
                 chartSection.innerHTML = `
-                    <h5>${statusName}</h5>
-                    <div class="chart-wrapper" style="height: 200px;">
-                        <canvas id="statusChart-${index}"></canvas>
-                    </div>
-                `;
+                <h5>${statusName}</h5>
+                <p class="text-muted small mb-2">
+                    Распределение времени, проведенного задачами в статусе "${statusName}"
+                </p>
+                <div class="chart-wrapper" style="height: 200px;">
+                    <canvas id="statusChart-${index}"></canvas>
+                </div>
+                <div class="mt-2 small text-muted">
+                    Всего задач в статусе: ${statusChartData.data.reduce((a, b) => a + b, 0)}
+                </div>
+            `;
 
                 container.appendChild(chartSection);
 
@@ -334,8 +545,8 @@
                                 datasets: [{
                                     label: 'Количество задач',
                                     data: statusChartData.data,
-                                    backgroundColor: getStatusColor(index),
-                                    borderColor: getStatusColor(index).replace('0.6', '1'),
+                                    backgroundColor: getStatusColor(statusName, index),
+                                    borderColor: getStatusColor(statusName, index).replace('0.6', '1'),
                                     borderWidth: 1
                                 }]
                             },
@@ -348,6 +559,9 @@
                                         title: {
                                             display: true,
                                             text: 'Количество задач'
+                                        },
+                                        ticks: {
+                                            stepSize: 1
                                         }
                                     },
                                     x: {
@@ -360,6 +574,13 @@
                                 plugins: {
                                     legend: {
                                         display: false
+                                    },
+                                    tooltip: {
+                                        callbacks: {
+                                            label: function(context) {
+                                                return `Задач: ${context.parsed.y}`;
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -368,14 +589,38 @@
                 }, 10);
             });
 
-            console.log('✅ Диаграммы по состояниям инициализированы');
+            console.log('✅ Диаграммы по состояниям инициализированы с реальными данными');
 
         } catch (error) {
             console.error('❌ Ошибка создания диаграмм по состояниям:', error);
+            const container = document.getElementById('statusChartsContainer');
+            container.innerHTML = `
+            <div class="alert alert-danger">
+                <strong>Ошибка:</strong> Не удалось загрузить данные распределения времени по состояниям.
+                <br>${error.message}
+            </div>
+        `;
         }
     }
 
-    function getStatusColor(index) {
+    function getStatusColor(statusName, index) {
+        const statusColors = {
+            'To Do': 'rgba(217, 83, 79, 0.6)',
+            'In Progress': 'rgba(54, 162, 235, 0.6)',
+            'Code Review': 'rgba(255, 206, 86, 0.6)',
+            'Testing': 'rgba(153, 102, 255, 0.6)',
+            'Done': 'rgba(75, 192, 192, 0.6)',
+            'Resolved': 'rgba(75, 192, 192, 0.6)',
+            'Closed': 'rgba(92, 184, 92, 0.6)',
+            'Reopened': 'rgba(91, 192, 222, 0.6)',
+            'Blocked': 'rgba(255, 0, 0, 0.6)',
+            'Open': 'rgba(66, 139, 202, 0.6)'
+        };
+
+        return statusColors[statusName] || getDefaultColor(index);
+    }
+
+    function getDefaultColor(index) {
         const colors = [
             'rgba(255, 99, 132, 0.6)',
             'rgba(54, 162, 235, 0.6)',
@@ -385,6 +630,8 @@
         ];
         return colors[index % colors.length];
     }
+
+
 
     function initDailyIssueChart(dailyData) {
         try {

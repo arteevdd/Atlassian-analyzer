@@ -1,6 +1,5 @@
 package ru.spbstu.atlassiananalyzer.controller;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -8,7 +7,10 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseBody;
 import ru.spbstu.atlassiananalyzer.dto.IssueDto;
 import ru.spbstu.atlassiananalyzer.dto.ProjectDto;
 import ru.spbstu.atlassiananalyzer.service.JiraService;
@@ -144,87 +146,160 @@ public class ProjectController {
     private Map<String, Object> generatePriorityChartData(List<IssueDto> issues) {
         logger.info("Generating priority chart data for {} issues", issues.size());
 
-        boolean hasAnyPriority = issues.stream()
-                .anyMatch(issue -> issue.getFields().getPriority() != null
-                        && issue.getFields().getPriority().getName() != null);
+        // Простая логика - всегда показываем статусы если нет приоритетов
+        Map<String, Long> stats = new HashMap<>();
+        boolean hasRealPriority = false;
 
-        if (!hasAnyPriority) {
-            logger.warn("No priority data found for any issue. Showing status distribution instead.");
+        for (IssueDto issue : issues) {
+            if (issue.getFields().getPriority() != null &&
+                    issue.getFields().getPriority().getName() != null &&
+                    !"Not set".equals(issue.getFields().getPriority().getName())) {
 
-            Map<String, Long> statusStats = issues.stream()
-                    .filter(issue -> issue.getFields().getStatus() != null
-                            && issue.getFields().getStatus().getName() != null)
-                    .collect(Collectors.groupingBy(
-                            issue -> issue.getFields().getStatus().getName(),
-                            Collectors.counting()
-                    ));
+                String priorityName = issue.getFields().getPriority().getName();
+                stats.merge(priorityName, 1L, Long::sum);
+                hasRealPriority = true;
 
-            if (statusStats.isEmpty()) {
-                logger.error("No status data found either!");
-                return createFallbackChartData(issues.size());
+            } else {
+                // Если нет приоритета, используем статус
+                String statusName = "No Priority";
+                if (issue.getFields().getStatus() != null &&
+                        issue.getFields().getStatus().getName() != null) {
+                    statusName = issue.getFields().getStatus().getName();
+                }
+                stats.merge(statusName, 1L, Long::sum);
             }
-
-            List<Map.Entry<String, Long>> sortedStatuses = statusStats.entrySet().stream()
-                    .sorted(Map.Entry.<String, Long>comparingByValue().reversed())
-                    .collect(Collectors.toList());
-
-            List<String> labels = new ArrayList<>();
-            List<Long> data = new ArrayList<>();
-            List<String> backgroundColor = new ArrayList<>();
-            List<String> borderColor = new ArrayList<>();
-
-            Map<String, String[]> statusColors = createStatusColors();
-
-            for (Map.Entry<String, Long> entry : sortedStatuses) {
-                String statusName = entry.getKey();
-                Long count = entry.getValue();
-
-                labels.add(statusName);
-                data.add(count);
-
-                String[] colors = statusColors.getOrDefault(statusName,
-                        new String[]{"rgba(153, 102, 255, 0.6)", "rgba(153, 102, 255, 1)"});
-
-                backgroundColor.add(colors[0]);
-                borderColor.add(colors[1]);
-            }
-
-            Map<String, Object> result = new HashMap<>();
-            result.put("labels", labels);
-            result.put("data", data);
-            result.put("backgroundColor", backgroundColor);
-            result.put("borderColor", borderColor);
-            result.put("totalIssues", issues.size());
-            result.put("uniqueCategories", statusStats.size());
-            result.put("chartType", "status");
-            result.put("originalType", "priority");
-            result.put("message", "Приоритеты не указаны. Показано распределение по статусам.");
-            result.put("hasPriorityData", false);
-
-            logger.info("Status stats (instead of priority): {}", statusStats);
-            return result;
         }
 
-        logger.info("Priority data found, generating priority chart");
-        return generateRealPriorityChartData(issues);
+        // Сортировка
+        List<Map.Entry<String, Long>> sorted = stats.entrySet().stream()
+                .sorted(Map.Entry.<String, Long>comparingByValue().reversed())
+                .collect(Collectors.toList());
+
+        // Подготовка данных
+        List<String> labels = new ArrayList<>();
+        List<Long> data = new ArrayList<>();
+
+        for (Map.Entry<String, Long> entry : sorted) {
+            labels.add(entry.getKey());
+            data.add(entry.getValue());
+        }
+
+        // Автоматические цвета
+        List<String> backgroundColors = generateColors(labels.size());
+        List<String> borderColors = backgroundColors.stream()
+                .map(color -> color.replace("0.6", "1").replace("0.7", "1"))
+                .collect(Collectors.toList());
+
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("labels", labels);
+        result.put("data", data);
+        result.put("backgroundColor", backgroundColors);
+        result.put("borderColor", borderColors);
+        result.put("totalIssues", issues.size());
+        result.put("uniqueCategories", stats.size());
+        result.put("chartType", hasRealPriority ? "priority" : "status");
+        result.put("message", hasRealPriority ?
+                "Распределение задач по приоритетам" :
+                "Приоритеты не указаны. Показано распределение по статусам.");
+        result.put("hasPriorityData", hasRealPriority);
+
+        logger.info("Generated chart with {} categories, hasPriorityData: {}",
+                stats.size(), hasRealPriority);
+
+        return result;
     }
 
-    private Map<String, Object> generateRealPriorityChartData(List<IssueDto> issues) {
-        Map<String, Long> priorityStats = issues.stream()
-                .filter(issue -> issue.getFields().getPriority() != null
-                        && issue.getFields().getPriority().getName() != null)
+    // Простой генератор цветов
+    private List<String> generateColors(int count) {
+        String[] baseColors = {
+                "rgba(255, 99, 132, 0.6)",    // Красный
+                "rgba(54, 162, 235, 0.6)",    // Синий
+                "rgba(255, 206, 86, 0.6)",    // Желтый
+                "rgba(75, 192, 192, 0.6)",    // Зеленый
+                "rgba(153, 102, 255, 0.6)",   // Фиолетовый
+                "rgba(255, 159, 64, 0.6)",    // Оранжевый
+                "rgba(201, 203, 207, 0.6)"    // Серый
+        };
+
+        List<String> colors = new ArrayList<>();
+        for (int i = 0; i < count; i++) {
+            colors.add(baseColors[i % baseColors.length]);
+        }
+        return colors;
+    }
+
+    private Map<String, Object> generateFallbackToStatusChart(List<IssueDto> issues) {
+        logger.info("Showing status distribution instead of priority");
+
+        Map<String, Long> statusStats = issues.stream()
+                .filter(issue -> issue.getFields().getStatus() != null &&
+                        issue.getFields().getStatus().getName() != null)
                 .collect(Collectors.groupingBy(
-                        issue -> issue.getFields().getPriority().getName(),
+                        issue -> issue.getFields().getStatus().getName(),
                         Collectors.counting()
                 ));
 
-        long issuesWithoutPriority = issues.stream()
-                .filter(issue -> issue.getFields().getPriority() == null
-                        || issue.getFields().getPriority().getName() == null)
-                .count();
+        if (statusStats.isEmpty()) {
+            logger.error("No status data found either!");
+            return createFallbackChartData(issues.size());
+        }
 
-        if (issuesWithoutPriority > 0) {
-            priorityStats.put("Not set", issuesWithoutPriority);
+        List<Map.Entry<String, Long>> sortedStatuses = statusStats.entrySet().stream()
+                .sorted(Map.Entry.<String, Long>comparingByValue().reversed())
+                .collect(Collectors.toList());
+
+        List<String> labels = new ArrayList<>();
+        List<Long> data = new ArrayList<>();
+        List<String> backgroundColor = new ArrayList<>();
+        List<String> borderColor = new ArrayList<>();
+
+        Map<String, String[]> statusColors = createStatusColors();
+
+        for (Map.Entry<String, Long> entry : sortedStatuses) {
+            String statusName = entry.getKey();
+            Long count = entry.getValue();
+
+            labels.add(statusName);
+            data.add(count);
+
+            String[] colors = statusColors.getOrDefault(statusName,
+                    new String[]{"rgba(153, 102, 255, 0.6)", "rgba(153, 102, 255, 1)"});
+
+            backgroundColor.add(colors[0]);
+            borderColor.add(colors[1]);
+        }
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("labels", labels);
+        result.put("data", data);
+        result.put("backgroundColor", backgroundColor);
+        result.put("borderColor", borderColor);
+        result.put("totalIssues", issues.size());
+        result.put("uniqueCategories", statusStats.size());
+        result.put("chartType", "status");
+        result.put("originalType", "priority");
+        result.put("message", "Приоритеты не указаны в данных. Показано распределение по статусам.");
+        result.put("hasPriorityData", false);
+
+        logger.info("Status stats (instead of priority): {}", statusStats);
+        return result;
+    }
+
+    private Map<String, Object> generateRealPriorityChartData(List<IssueDto> issues) {
+        logger.info("Generating REAL priority chart data for {} issues", issues.size());
+
+        Map<String, Long> priorityStats = new HashMap<>();
+
+        for (IssueDto issue : issues) {
+            String priorityName = "Not set";
+
+            if (issue.getFields().getPriority() != null &&
+                    issue.getFields().getPriority().getName() != null) {
+                priorityName = issue.getFields().getPriority().getName();
+            }
+
+            priorityStats.merge(priorityName, 1L, Long::sum);
         }
 
         List<Map.Entry<String, Long>> sortedPriorities = priorityStats.entrySet().stream()
@@ -260,12 +335,16 @@ public class ProjectController {
         result.put("totalIssues", issues.size());
         result.put("uniqueCategories", priorityStats.size());
         result.put("chartType", "priority");
-        result.put("originalType", "priority");
         result.put("message", "Распределение задач по приоритетам");
-        result.put("hasPriorityData", true);
+        result.put("hasPriorityData", priorityStats.keySet().stream()
+                .anyMatch(key -> !"Not set".equals(key)));
+
+        logger.info("Priority stats: {} categories, {} total issues",
+                priorityStats.size(), issues.size());
 
         return result;
     }
+
 
     private Map<String, String[]> createStatusColors() {
         Map<String, String[]> colors = new HashMap<>();
