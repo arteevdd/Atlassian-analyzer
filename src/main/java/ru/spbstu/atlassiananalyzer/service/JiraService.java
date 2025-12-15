@@ -31,7 +31,7 @@ public class JiraService {
     public JiraService(RestTemplate restTemplate, @Value("${jira.base-url}") String jiraBaseUrl) {
         this.restTemplate = restTemplate;
         this.jiraBaseUrl = jiraBaseUrl;
-        this.executorService = Executors.newFixedThreadPool(5); // Уменьшим количество потоков
+        this.executorService = Executors.newFixedThreadPool(5);
     }
 
     public List<ProjectDto> getAllProjects() {
@@ -42,17 +42,14 @@ public class JiraService {
         List<ProjectDto> projectList = Arrays.asList(projects);
         logger.info("Fetched {} projects", projectList.size());
 
-        // Берем только первые 100 проектов для быстрой демонстрации
         List<ProjectDto> limitedProjects = projectList.stream()
                 .limit(100)
                 .collect(Collectors.toList());
 
-        // Получаем полную информацию только для ограниченного количества проектов
         List<CompletableFuture<ProjectDto>> futures = limitedProjects.stream()
                 .map(project -> CompletableFuture.supplyAsync(() -> getProjectByKey(project.getKey()), executorService))
                 .collect(Collectors.toList());
 
-        // Ждем завершения всех запросов
         List<ProjectDto> fullProjects = futures.stream()
                 .map(CompletableFuture::join)
                 .collect(Collectors.toList());
@@ -69,7 +66,6 @@ public class JiraService {
             return project;
         } catch (Exception e) {
             logger.error("Error fetching project {}: {}", projectKey, e.getMessage());
-            // Возвращаем базовую информацию если не удалось получить полную
             return new ProjectDto(projectKey, projectKey, null);
         }
     }

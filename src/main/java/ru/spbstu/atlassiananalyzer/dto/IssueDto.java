@@ -72,7 +72,6 @@ public class IssueDto {
             this.priority = priority;
         }
 
-        // Геттеры и сеттеры
         public Long getTimespent() {
             return timespent;
         }
@@ -220,7 +219,6 @@ public class IssueDto {
         }
     }
 
-    // Дополнительный класс для timetracking
     @JsonIgnoreProperties(ignoreUnknown = true)
     public static class TimeTracking {
         @JsonProperty("originalEstimate")

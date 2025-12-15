@@ -29,12 +29,10 @@ public class MainController {
     public String index(Model model) {
         List<ProjectDto> projects = jiraService.getAllProjects();
 
-        // Очищаем описания
         List<ProjectDto> cleanedProjects = projects.stream()
                 .map(this::cleanProjectDescription)
                 .collect(Collectors.toList());
 
-        // Логируем результат
         long withDescriptions = cleanedProjects.stream()
                 .filter(p -> p.getDescription() != null)
                 .count();
@@ -51,20 +49,16 @@ public class MainController {
         cleanedProject.setKey(project.getKey());
         cleanedProject.setName(project.getName());
 
-        // Для retired проектов не показываем описание
         if (isRetired) {
             cleanedProject.setDescription(null);
         } else {
-            // Для активных проектов очищаем HTML теги
             String cleanedDescription = project.getDescription();
             if (cleanedDescription != null && !cleanedDescription.equals("null") && !cleanedDescription.isEmpty()) {
-                // Удаляем HTML теги
                 cleanedDescription = cleanedDescription
                         .replaceAll("<[^>]*>", "")
                         .replaceAll("\\s+", " ")
                         .trim();
 
-                // Если после очистки осталась пустая строка, считаем что описания нет
                 if (cleanedDescription.isEmpty()) {
                     cleanedDescription = null;
                 } else if (cleanedDescription.length() > 120) {

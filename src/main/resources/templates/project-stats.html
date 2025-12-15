@@ -184,16 +184,13 @@
 </div>
 
 <script>
-    // Получаем данные из Thymeleaf
     const projectKey = '[[${projectKey}]]';
     console.log('📊 Инициализация страницы статистики для проекта:', projectKey);
 
-    // Основная функция загрузки данных и инициализации графиков
     async function loadAndRenderCharts() {
         try {
             console.log('📡 Загружаем данные для графиков...');
 
-            // 1. Загружаем данные с API
             const response = await fetch(`/project/${projectKey}/stats/data`);
 
             if (!response.ok) {
@@ -203,18 +200,14 @@
             const chartData = await response.json();
             console.log('✅ Данные получены:', chartData);
 
-            // 2. Проверяем наличие ошибки в ответе
             if (chartData.error) {
                 throw new Error(chartData.error);
             }
 
-            // 3. Инициализируем гистограмму времени в открытом состоянии
             initOpenTimeHistogram(chartData.openTimeHistogram);
 
-            // 4. Инициализируем диаграммы по состояниям
             initStatusCharts(chartData.statusTimeDistribution);
 
-            // 5. Инициализируем график по дням
             if (chartData.dailyIssueChart) {
                 initDailyIssueChart(chartData.dailyIssueChart);
             } else {
@@ -242,7 +235,6 @@
         } catch (error) {
             console.error('❌ Ошибка загрузки графиков:', error);
 
-            // Показываем сообщение об ошибке
             const alertDiv = document.createElement('div');
             alertDiv.className = 'alert alert-warning';
             alertDiv.innerHTML = `
@@ -252,20 +244,17 @@
 
             document.querySelector('.container').appendChild(alertDiv);
 
-            // Показываем fallback-данные или скрываем спиннеры
             document.querySelectorAll('.loading-spinner').forEach(spinner => {
                 spinner.innerHTML = '<p class="text-muted">Данные временно недоступны</p>';
             });
         }
     }
 
-    // Инициализация гистограммы
     function initOpenTimeHistogram(histogramData) {
         try {
             const canvas = document.getElementById('openTimeHistogram');
             const ctx = canvas.getContext('2d');
 
-            // Скрываем спиннер и показываем canvas
             canvas.parentElement.querySelector('.loading-spinner').style.display = 'none';
             canvas.style.display = 'block';
 
@@ -313,18 +302,14 @@
         }
     }
 
-    // Инициализация диаграмм по состояниям
     function initStatusCharts(statusData) {
         try {
             const container = document.getElementById('statusChartsContainer');
 
-            // Скрываем спиннер
             container.querySelector('.loading-spinner').style.display = 'none';
 
-            // Очищаем контейнер
             container.innerHTML = '';
 
-            // Создаем диаграммы для каждого статуса
             Object.entries(statusData).forEach(([statusName, statusChartData], index) => {
                 const chartSection = document.createElement('div');
                 chartSection.className = 'status-chart-section mb-4';
@@ -337,7 +322,6 @@
 
                 container.appendChild(chartSection);
 
-                // Инициализируем диаграмму
                 setTimeout(() => {
                     const canvas = document.getElementById(`statusChart-${index}`);
                     if (canvas) {
@@ -391,7 +375,6 @@
         }
     }
 
-    // Функция для получения цвета
     function getStatusColor(index) {
         const colors = [
             'rgba(255, 99, 132, 0.6)',
@@ -407,7 +390,6 @@
         try {
             const ctx = document.getElementById('dailyIssueChart').getContext('2d');
 
-            // Создаём график с несколькими наборами данных
             new Chart(ctx, {
                 type: 'line',
                 data: {
@@ -512,7 +494,7 @@
                     }]
                 },
                 options: {
-                    indexAxis: 'y', // Горизонтальные бары
+                    indexAxis: 'y',
                     responsive: true,
                     maintainAspectRatio: false,
                     scales: {
@@ -564,7 +546,6 @@
             const canvas = document.getElementById('loggedTimeChart');
             const ctx = canvas.getContext('2d');
 
-            // Обновляем описание в зависимости от источника данных
             const description = document.getElementById('loggedTimeDescription');
             if (timeData.dataSource === 'timespent') {
                 description.textContent = 'Распределение реального затраченного времени на выполнение задач (только закрытые задачи).';
@@ -636,14 +617,11 @@
             const canvas = document.getElementById('priorityChart');
             const ctx = canvas.getContext('2d');
 
-            // 1. Добавляем информационное сообщение
             const chartContainer = canvas.closest('.chart-container');
 
-            // Удаляем старое сообщение, если есть
             const oldAlert = chartContainer.querySelector('.priority-alert');
             if (oldAlert) oldAlert.remove();
 
-            // Создаем новое сообщение
             if (priorityData.message) {
                 const alertDiv = document.createElement('div');
                 alertDiv.className = 'priority-alert alert alert-info mt-3 mb-3';
@@ -656,12 +634,10 @@
                 </small>
             `;
 
-                // Вставляем после заголовка
                 const title = chartContainer.querySelector('.chart-title');
                 title.insertAdjacentElement('afterend', alertDiv);
             }
 
-            // 2. Меняем заголовок графика в зависимости от типа
             const titleElement = chartContainer.querySelector('.chart-title');
             if (priorityData.chartType === 'status' && titleElement) {
                 titleElement.textContent = 'Распределение задач по статусам';
@@ -669,7 +645,6 @@
                 titleElement.textContent = 'Распределение задач по приоритетам';
             }
 
-            // 3. Обновляем описание
             const description = chartContainer.querySelector('.text-muted');
             if (description) {
                 if (priorityData.chartType === 'status') {
@@ -679,7 +654,6 @@
                 }
             }
 
-            // 4. Создаем график (остальной код без изменений)
             const chart = new Chart(ctx, {
                 type: 'pie',
                 data: {
@@ -732,7 +706,6 @@
                 }
             });
 
-            // 5. Добавляем текстовую статистику
             const statsElement = document.getElementById('priorityStats');
             if (statsElement) {
                 const total = priorityData.totalIssues || priorityData.data.reduce((a, b) => a + b, 0);
@@ -758,7 +731,6 @@
         }
     }
 
-    // Запускаем загрузку при полной загрузке DOM
     document.addEventListener('DOMContentLoaded', function() {
         console.log('🚀 Страница загружена, начинаем загрузку графиков...');
         loadAndRenderCharts();

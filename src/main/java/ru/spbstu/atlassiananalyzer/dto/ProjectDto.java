@@ -15,7 +15,6 @@ public class ProjectDto {
     @JsonProperty("description")
     private String description;
 
-    // Конструкторы
     public ProjectDto() {}
 
     public ProjectDto(String key, String name, String description) {
@@ -24,7 +23,6 @@ public class ProjectDto {
         this.description = description;
     }
 
-    // Геттеры и сеттеры
     public String getKey() {
         return key;
     }

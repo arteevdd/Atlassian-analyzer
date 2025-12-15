@@ -131,7 +131,6 @@ public class ProjectController {
     private Map<String, Object> generatePriorityChartData(List<IssueDto> issues) {
         logger.info("Generating priority chart data for {} issues", issues.size());
 
-        // 1. Проверяем, есть ли хоть у одной задачи приоритет
         boolean hasAnyPriority = issues.stream()
                 .anyMatch(issue -> issue.getFields().getPriority() != null
                         && issue.getFields().getPriority().getName() != null);
@@ -139,7 +138,6 @@ public class ProjectController {
         if (!hasAnyPriority) {
             logger.warn("No priority data found for any issue. Showing status distribution instead.");
 
-            // 1A. Собираем статистику по статусам
             Map<String, Long> statusStats = issues.stream()
                     .filter(issue -> issue.getFields().getStatus() != null
                             && issue.getFields().getStatus().getName() != null)
@@ -148,24 +146,20 @@ public class ProjectController {
                             Collectors.counting()
                     ));
 
-            // 1B. Если нет статусов (маловероятно), возвращаем заглушку
             if (statusStats.isEmpty()) {
                 logger.error("No status data found either!");
                 return createFallbackChartData(issues.size());
             }
 
-            // 1C. Сортируем по количеству задач (по убыванию)
             List<Map.Entry<String, Long>> sortedStatuses = statusStats.entrySet().stream()
                     .sorted(Map.Entry.<String, Long>comparingByValue().reversed())
                     .collect(Collectors.toList());
 
-            // 1D. Подготавливаем данные для графика
             List<String> labels = new ArrayList<>();
             List<Long> data = new ArrayList<>();
             List<String> backgroundColor = new ArrayList<>();
             List<String> borderColor = new ArrayList<>();
 
-            // Цвета для разных статусов
             Map<String, String[]> statusColors = createStatusColors();
 
             for (Map.Entry<String, Long> entry : sortedStatuses) {
@@ -175,7 +169,6 @@ public class ProjectController {
                 labels.add(statusName);
                 data.add(count);
 
-                // Получаем цвета для статуса
                 String[] colors = statusColors.getOrDefault(statusName,
                         new String[]{"rgba(153, 102, 255, 0.6)", "rgba(153, 102, 255, 1)"});
 
@@ -183,7 +176,6 @@ public class ProjectController {
                 borderColor.add(colors[1]);
             }
 
-            // 1E. Формируем результат
             Map<String, Object> result = new HashMap<>();
             result.put("labels", labels);
             result.put("data", data);
@@ -200,12 +192,10 @@ public class ProjectController {
             return result;
         }
 
-        // 2. Если приоритеты есть - выполняем оригинальный код
         logger.info("Priority data found, generating priority chart");
         return generateRealPriorityChartData(issues);
     }
 
-    // Метод для создания реального графика приоритетов (если данные есть)
     private Map<String, Object> generateRealPriorityChartData(List<IssueDto> issues) {
         Map<String, Long> priorityStats = issues.stream()
                 .filter(issue -> issue.getFields().getPriority() != null
@@ -215,7 +205,6 @@ public class ProjectController {
                         Collectors.counting()
                 ));
 
-        // Обработка задач без приоритета
         long issuesWithoutPriority = issues.stream()
                 .filter(issue -> issue.getFields().getPriority() == null
                         || issue.getFields().getPriority().getName() == null)
@@ -225,7 +214,6 @@ public class ProjectController {
             priorityStats.put("Not set", issuesWithoutPriority);
         }
 
-        // Сортировка и подготовка данных
         List<Map.Entry<String, Long>> sortedPriorities = priorityStats.entrySet().stream()
                 .sorted(Map.Entry.<String, Long>comparingByValue().reversed())
                 .collect(Collectors.toList());
@@ -235,7 +223,6 @@ public class ProjectController {
         List<String> backgroundColor = new ArrayList<>();
         List<String> borderColor = new ArrayList<>();
 
-        // Цвета для приоритетов
         Map<String, String[]> priorityColors = createPriorityColors();
 
         for (Map.Entry<String, Long> entry : sortedPriorities) {
@@ -267,24 +254,21 @@ public class ProjectController {
         return result;
     }
 
-    // Создание цветов для статусов
     private Map<String, String[]> createStatusColors() {
         Map<String, String[]> colors = new HashMap<>();
 
-        // Стандартные цвета для статусов JIRA
-        colors.put("Open", new String[]{"rgba(66, 139, 202, 0.7)", "rgba(66, 139, 202, 1)"});         // Синий
-        colors.put("In Progress", new String[]{"rgba(92, 184, 92, 0.7)", "rgba(92, 184, 92, 1)"});     // Зеленый
-        colors.put("Resolved", new String[]{"rgba(240, 173, 78, 0.7)", "rgba(240, 173, 78, 1)"});      // Оранжевый
-        colors.put("Closed", new String[]{"rgba(217, 83, 79, 0.7)", "rgba(217, 83, 79, 1)"});          // Красный
-        colors.put("Reopened", new String[]{"rgba(91, 192, 222, 0.7)", "rgba(91, 192, 222, 1)"});      // Голубой
-        colors.put("To Do", new String[]{"rgba(217, 83, 79, 0.7)", "rgba(217, 83, 79, 1)"});           // Красный
-        colors.put("Done", new String[]{"rgba(92, 184, 92, 0.7)", "rgba(92, 184, 92, 1)"});            // Зеленый
-        colors.put("Blocked", new String[]{"rgba(255, 0, 0, 0.7)", "rgba(255, 0, 0, 1)"});             // Ярко-красный
+        colors.put("Open", new String[]{"rgba(66, 139, 202, 0.7)", "rgba(66, 139, 202, 1)"});
+        colors.put("In Progress", new String[]{"rgba(92, 184, 92, 0.7)", "rgba(92, 184, 92, 1)"});
+        colors.put("Resolved", new String[]{"rgba(240, 173, 78, 0.7)", "rgba(240, 173, 78, 1)"});
+        colors.put("Closed", new String[]{"rgba(217, 83, 79, 0.7)", "rgba(217, 83, 79, 1)"});
+        colors.put("Reopened", new String[]{"rgba(91, 192, 222, 0.7)", "rgba(91, 192, 222, 1)"});
+        colors.put("To Do", new String[]{"rgba(217, 83, 79, 0.7)", "rgba(217, 83, 79, 1)"});
+        colors.put("Done", new String[]{"rgba(92, 184, 92, 0.7)", "rgba(92, 184, 92, 1)"});
+        colors.put("Blocked", new String[]{"rgba(255, 0, 0, 0.7)", "rgba(255, 0, 0, 1)"});
 
         return colors;
     }
 
-    // Создание цветов для приоритетов
     private Map<String, String[]> createPriorityColors() {
         Map<String, String[]> colors = new HashMap<>();
 
@@ -298,7 +282,6 @@ public class ProjectController {
         return colors;
     }
 
-    // Запасной вариант на крайний случай
     private Map<String, Object> createFallbackChartData(int totalIssues) {
         Map<String, Object> result = new HashMap<>();
 
@@ -321,33 +304,27 @@ public class ProjectController {
         return result;
     }
     private Map<String, Object> generateLoggedTimeChartData(List<IssueDto> issues) {
-        // Фильтруем только закрытые задачи
         List<IssueDto> closedIssues = issues.stream()
                 .filter(issue -> issue.getFields().getResolutionDate() != null)
                 .collect(Collectors.toList());
 
         logger.info("Processing {} closed issues for logged time chart", closedIssues.size());
 
-        // Проверяем, есть ли данные о затраченном времени
         boolean hasTimespent = closedIssues.stream()
                 .anyMatch(issue -> issue.getFields().getTimespent() != null);
 
-        // Собираем данные о времени
         List<Long> timeValues = new ArrayList<>();
 
         if (hasTimespent) {
-            // Вариант 1: Используем реальное затраченное время
             for (IssueDto issue : closedIssues) {
                 Long timespent = issue.getFields().getTimespent();
                 if (timespent != null && timespent > 0) {
-                    // Переводим секунды в часы
                     long hours = timespent / 3600;
                     timeValues.add(hours);
                 }
             }
             logger.info("Using timespent field: {} tasks have time data", timeValues.size());
         } else {
-            // Вариант 2: Используем оценку времени
             for (IssueDto issue : closedIssues) {
                 Long timeEstimate = issue.getFields().getTimeoriginalestimate();
                 if (timeEstimate != null && timeEstimate > 0) {
@@ -358,7 +335,6 @@ public class ProjectController {
             logger.info("Using timeoriginalestimate field: {} tasks have estimate data", timeValues.size());
         }
 
-        // Если данных всё ещё нет, используем разницу дат
         if (timeValues.isEmpty()) {
             logger.info("No time data found, using date difference as fallback");
             for (IssueDto issue : closedIssues) {
@@ -379,7 +355,6 @@ public class ProjectController {
             }
         }
 
-        // Создаём интервалы (бакеты) для гистограммы
         List<Integer> buckets = Arrays.asList(0, 0, 0, 0, 0, 0, 0);
         List<String> bucketLabels = Arrays.asList(
                 "< 1 часа", "1-4 часа", "4-8 часов", "1-3 дня", "3-7 дней", "1-2 недели", "> 2 недель"
@@ -390,15 +365,14 @@ public class ProjectController {
             if (hours < 1) bucketIndex = 0;
             else if (hours < 4) bucketIndex = 1;
             else if (hours < 8) bucketIndex = 2;
-            else if (hours < 24 * 3) bucketIndex = 3; // 3 дня
-            else if (hours < 24 * 7) bucketIndex = 4; // 7 дней
-            else if (hours < 24 * 14) bucketIndex = 5; // 2 недели
+            else if (hours < 24 * 3) bucketIndex = 3;
+            else if (hours < 24 * 7) bucketIndex = 4;
+            else if (hours < 24 * 14) bucketIndex = 5;
             else bucketIndex = 6;
 
             buckets.set(bucketIndex, buckets.get(bucketIndex) + 1);
         }
 
-        // Формируем результат
         Map<String, Object> result = new HashMap<>();
         result.put("labels", bucketLabels);
         result.put("data", buckets);
@@ -412,7 +386,6 @@ public class ProjectController {
     }
 
     private Map<String, Object> generateUserStatsChartData(List<IssueDto> issues) {
-        // 1. Собираем статистику по исполнителям (assignee)
         Map<String, Long> assigneeStats = issues.stream()
                 .filter(issue -> issue.getFields().getAssignee() != null)
                 .collect(Collectors.groupingBy(
@@ -420,7 +393,6 @@ public class ProjectController {
                         Collectors.counting()
                 ));
 
-        // 2. Собираем статистику по репортёрам (reporter)
         Map<String, Long> reporterStats = issues.stream()
                 .filter(issue -> issue.getFields().getReporter() != null)
                 .collect(Collectors.groupingBy(
@@ -428,36 +400,29 @@ public class ProjectController {
                         Collectors.counting()
                 ));
 
-        // 3. Объединяем статистику (можно также разделить на два графика)
-        // Здесь покажем общее количество задач на пользователя (assignee + reporter)
+
         Map<String, Long> combinedStats = new HashMap<>();
 
-        // Добавляем задачи как исполнителя
         assigneeStats.forEach((user, count) ->
                 combinedStats.put(user + " (исполнитель)", count));
 
-        // Добавляем задачи как репортёра
         reporterStats.forEach((user, count) ->
                 combinedStats.merge(user + " (репортёр)", count, Long::sum));
 
-        // 4. Сортируем по убыванию количества задач и берём топ-30
         List<Map.Entry<String, Long>> topUsers = combinedStats.entrySet().stream()
                 .sorted(Map.Entry.<String, Long>comparingByValue().reversed())
                 .limit(30)
                 .collect(Collectors.toList());
 
-        // 5. Подготавливаем данные для графика
         List<String> labels = new ArrayList<>();
         List<Long> data = new ArrayList<>();
 
-        // Идём в обратном порядке для красивого отображения (сверху самый активный)
         for (int i = topUsers.size() - 1; i >= 0; i--) {
             Map.Entry<String, Long> entry = topUsers.get(i);
             labels.add(entry.getKey());
             data.add(entry.getValue());
         }
 
-        // 6. Формируем результат
         Map<String, Object> result = new HashMap<>();
         result.put("labels", labels);
         result.put("data", data);
@@ -471,21 +436,16 @@ public class ProjectController {
     }
 
     private Map<String, Object> generateDailyIssueChartData(List<IssueDto> issues) {
-        // Фильтруем только закрытые задачи для подсчёта закрытий
         List<IssueDto> closedIssues = issues.stream()
                 .filter(issue -> issue.getFields().getResolutionDate() != null)
                 .collect(Collectors.toList());
 
-        // 1. Инициализируем структуры для хранения данных по дням
-        //    Используем TreeMap для автоматической сортировки дат по возрастанию
         Map<LocalDate, DailyStats> dailyStatsMap = new TreeMap<>();
 
-        // 2. Обрабатываем ВСЕ задачи (открытые и закрытые) для подсчёта созданий
         for (IssueDto issue : issues) {
             try {
                 LocalDate createdDate = LocalDate.parse(issue.getFields().getCreated().substring(0, 10));
 
-                // Увеличиваем счётчик созданных задач на эту дату
                 DailyStats stats = dailyStatsMap.computeIfAbsent(createdDate, k -> new DailyStats());
                 stats.createdCount++;
 
@@ -494,12 +454,10 @@ public class ProjectController {
             }
         }
 
-        // 3. Обрабатываем ЗАКРЫТЫЕ задачи для подсчёта закрытий
         for (IssueDto issue : closedIssues) {
             try {
                 LocalDate resolvedDate = LocalDate.parse(issue.getFields().getResolutionDate().substring(0, 10));
 
-                // Увеличиваем счётчик закрытых задач на эту дату
                 DailyStats stats = dailyStatsMap.computeIfAbsent(resolvedDate, k -> new DailyStats());
                 stats.resolvedCount++;
 
@@ -508,7 +466,6 @@ public class ProjectController {
             }
         }
 
-        // 4. Подготавливаем данные для графика
         List<String> labels = new ArrayList<>();
         List<Integer> createdData = new ArrayList<>();
         List<Integer> resolvedData = new ArrayList<>();
@@ -518,26 +475,21 @@ public class ProjectController {
         int totalCreated = 0;
         int totalResolved = 0;
 
-        // Проходим по дням в хронологическом порядке (благодаря TreeMap)
         for (Map.Entry<LocalDate, DailyStats> entry : dailyStatsMap.entrySet()) {
             LocalDate date = entry.getKey();
             DailyStats stats = entry.getValue();
 
-            // Форматируем дату для оси X
             labels.add(date.format(DateTimeFormatter.ofPattern("yyyy-MM-dd")));
 
-            // Данные за день
             createdData.add(stats.createdCount);
             resolvedData.add(stats.resolvedCount);
 
-            // Накопительный итог
             totalCreated += stats.createdCount;
             totalResolved += stats.resolvedCount;
             cumulativeCreated.add(totalCreated);
             cumulativeResolved.add(totalResolved);
         }
 
-        // 5. Формируем результат
         Map<String, Object> result = new HashMap<>();
         result.put("labels", labels);
         result.put("created", createdData);
@@ -548,7 +500,7 @@ public class ProjectController {
         logger.info("Daily chart data prepared for {} days", labels.size());
         return result;
     }
-    // Вспомогательный класс для хранения статистики за один день
+
     class DailyStats {
         int createdCount = 0;
         int resolvedCount = 0;
@@ -663,18 +615,15 @@ public class ProjectController {
         return result;
     }
 
-    @GetMapping("/{projectKey}/stats") // <-- Это тот маршрут, которого не хватает
+    @GetMapping("/{projectKey}/stats")
     public String projectStatsPage(@PathVariable String projectKey, Model model) {
         try {
-            // 1. Получаем базовую информацию о проекте для заголовка
             ProjectDto project = jiraService.getProjectByKey(projectKey);
             model.addAttribute("projectKey", project.getKey());
             model.addAttribute("projectName", project.getName());
 
-            // 2. (Опционально) Можно сразу подгрузить задачи для быстрой отрисовки
             List<IssueDto> issues = jiraService.getProjectIssues(projectKey, 500);
 
-            // 3. Рассчитываем общую статистику для отображения в шапке
             long totalIssues = issues.size();
             long closedIssues = issues.stream()
                     .filter(issue -> issue.getFields().getResolutionDate() != null)
@@ -688,7 +637,6 @@ public class ProjectController {
 
         } catch (Exception e) {
             logger.error("Error loading project {} for stats page: {}", projectKey, e.getMessage());
-            // Устанавливаем атрибуты по умолчанию в случае ошибки
             model.addAttribute("projectKey", projectKey);
             model.addAttribute("projectName", projectKey);
             model.addAttribute("totalIssues", 0);
@@ -696,7 +644,6 @@ public class ProjectController {
             model.addAttribute("error", "Не удалось загрузить данные проекта: " + e.getMessage());
         }
 
-        // 4. Возвращаем имя шаблона HTML страницы
-        return "project-stats"; // Это должен быть файл stats.html в папке templates/
+        return "project-stats";
     }
 }
