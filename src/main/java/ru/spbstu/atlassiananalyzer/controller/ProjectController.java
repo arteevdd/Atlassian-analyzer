@@ -45,17 +45,30 @@ public class ProjectController {
 
             List<IssueDto> issues = jiraService.getProjectIssues(projectKey, 200);
             model.addAttribute("issues", issues);
+
             model.addAttribute("jiraBaseUrl", jiraBaseUrl);
 
+            long totalIssues = issues.size();
+
             long completedCount = issues.stream()
-                    .filter(issue -> "Done".equals(issue.getFields().getStatus().getName()))
+                    .filter(issue -> issue.getFields().getResolutionDate() != null)
                     .count();
-            long inProgressCount = issues.stream()
-                    .filter(issue -> !"Done".equals(issue.getFields().getStatus().getName()))
-                    .count();
+
+            long inProgressCount = totalIssues - completedCount;
+
             long assignedCount = issues.stream()
                     .filter(issue -> issue.getFields().getAssignee() != null)
                     .count();
+
+            Map<String, Long> statusCounts = issues.stream()
+                    .collect(Collectors.groupingBy(
+                            issue -> issue.getFields().getStatus().getName(),
+                            Collectors.counting()
+                    ));
+
+            // Выводим в логи все статусы для отладки
+            logger.info("Статусы задач для проекта {}: {}", projectKey, statusCounts);
+            logger.info("Задачи с resolutionDate: {} из {}", completedCount, totalIssues);
 
             model.addAttribute("completedCount", completedCount);
             model.addAttribute("inProgressCount", inProgressCount);
